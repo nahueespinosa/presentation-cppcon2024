@@ -1,40 +1,1024 @@
 <!doctype html>
 <html lang="en">
-	<head>
-		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-		<title>reveal.js</title>
+        <title>Implementing Particle Filters with Ranges</title>
 
-		<link rel="stylesheet" href="dist/reset.css">
-		<link rel="stylesheet" href="dist/reveal.css">
-		<link rel="stylesheet" href="dist/theme/black.css">
+        <link rel="stylesheet" href="dist/reset.css">
+        <link rel="stylesheet" href="dist/reveal.css">
+        <link rel="stylesheet" href="dist/theme/white.css">
 
-		<!-- Theme used for syntax highlighted code -->
-		<link rel="stylesheet" href="plugin/highlight/monokai.css">
-	</head>
-	<body>
-		<div class="reveal">
-			<div class="slides">
-				<section>Slide 1</section>
-				<section>Slide 2</section>
-			</div>
-		</div>
+        <!-- Theme used for syntax highlighted code -->
+        <link rel="stylesheet" href="plugin/highlight/github.css">
 
-		<script src="dist/reveal.js"></script>
-		<script src="plugin/notes/notes.js"></script>
-		<script src="plugin/markdown/markdown.js"></script>
-		<script src="plugin/highlight/highlight.js"></script>
-		<script>
-			// More info about initialization & config:
-			// - https://revealjs.com/initialization/
-			// - https://revealjs.com/config/
-			Reveal.initialize({
-				hash: true,
+        <style type="text/css">
+            :root {
+                --r-main-font-size: 27px;
+            }
 
-				// Learn about plugins: https://revealjs.com/plugins/
-				plugins: [ RevealMarkdown, RevealHighlight, RevealNotes ]
-			});
-		</script>
-	</body>
+            .reveal-viewport {
+                background-image: url(img/ekumen.png);
+                background-size: 10%;
+                background-repeat: no-repeat;
+                background-position: 97% 3%;
+            }
+
+            .inline-code {
+                background-color: #eee;
+                font-size: 95%;
+                padding-right: 10px;
+                padding-left: 10px;
+                padding-top: 2px;
+                padding-bottom: 5px;
+                border-radius: 10px;
+            }
+
+            .disable-background {
+                background-image: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="reveal">
+            <div class="slides">
+                <section data-background-image="img/title_card.png" data-background-size="100%"></section>
+                <section data-state="disable-background">
+                    <div class="r-hstack">
+                        <div>
+                            <img src="img/me.png" style="height: 20rem; margin: 3rem;">
+                        </div>
+                        <div>
+                            <h2>About me 🇦🇷</h2>
+                            <p>Robotics Software Engineer<br/>(2020-present)</p>
+                            <img src="img/ekumen.png" style="height: 2rem;">
+                            <p>Repository Maintainer</p>
+                            <img src="img/beluga.png" style="height: 10vh; margin: 1em;">
+                        </div>
+                    </div>
+                    <aside class="notes">
+                        <p>Electronics Engineer from Buenos Aires</p>
+                        <p>Ekumen - software development services around the world - headquarters in Argentina and Europe</p>
+                        <p>Localization and simulation projects, maintainer of Beluga</p>
+                    </aside>
+                </section>
+                <section data-background-video="img/hallway.mp4" data-background-video-loop>
+                    <aside class="notes">
+                        <p>I wanted to show you exactly what problem...</p>
+                        <p>This is a simulation of an autonomous mobile robot...</p>
+                        <p>It collects sensor data from ..., and uses a particle filter to estimate...</p>
+                        <p>The red arrows represent different hypotheses... and by computing a weighted...</p>
+                    </aside>
+                </section>
+                <section>
+                    <h2>Talk Overview</h2>
+                    <ul>
+                        <li>Brief introduction to Particle Filters</li>
+                        <li>Brief mention to the C++ Ranges library</li>
+                        <li>Implementation walkthrough of a Particle Filter using C++23</li>
+                        <li>Practical recommendations and remarks</li>
+                    </ul>
+                        <aside class="notes">
+                            <p>Just as a quick overview, there will be a brief introduction...</p>
+                            <p>I will also mention the Ranges library, but ...</p>
+                            <p>BTW, this will be a 30-minute talk.</p>
+                            <p>So I will use most of our time...</p>
+                        </aside>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Bayesian Filters</h2>
+                    <p>Algorithms used to estimate the internal state of a dynamical system given <b>noisy observations</b> and <b>random perturbations</b> in the system itself.</p>
+                    <img src="img/bayesian_filter.drawio.svg" style="height: 20rem; margin: 1em;">
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Particle Filters</h2>
+                    <div class="r-hstack">
+                        <img src="img/bayesian_filter.drawio.svg" style="height: 30rem; margin: 0.5em;">
+                        <div class="r-stack">
+                            <div class="fragment fade-out" data-fragment-index="0">
+                                <img src="img/particles.drawio.svg" style="width: 30rem;">
+                                <p><code>BELIEF</code> - Represented by a set of particles</p>
+                                <p><code>PARTICLE</code> - A single hyphotesis of the <b>state</b> of the system with an associated <b>weight</b></p>
+                            </div>
+                            <ol>
+                                <li class="fragment" data-fragment-index="0">Prediction
+                                    <ul>
+                                        <li>Compute new states for each particle (transition model)</li>
+                                    </ul>
+                                </li>
+                                <li class="fragment" data-fragment-index="0">Update
+                                    <ul>
+                                        <li>Compute weights for each particle (observation model)</li>
+                                        <li><b>Resample</b><ul>
+                                            <li>Duplicate particles with high weights</li>
+                                            <li>Eliminate particles with low weights</li>
+                                        </ul></li>
+                                    </ul>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                    <aside class="notes">
+                        Resampling replicates high weight particles and eliminates low weight particles.
+                    </aside>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Monte Carlo Localization (MCL)</h2>
+                    <video data-autoplay controls width="80%" height="auto">
+                        <source src="img/beluga_andino.mp4" type="video/mp4">
+                    </video>
+                    <p><code>STATE</code> - Position and orientation of the robot</p>
+                    <p><code>TRANSITION</code> - Control commands, odometry, etc.</p>
+                    <p><code>OBSERVATION</code> - Sensor data (LIDAR, Camera, etc.)</p>
+                    <aside class="notes">
+                        Particle filter algorithms used to estimate the position and orientation of a robot given a map and sensor measurements.
+                    </aside>
+                </section>
+                <section data-auto-animate>
+                    <h2>C++ Ranges library</h2>
+                    <p>Extension and generalization of the algorithm and iterator libraries.</p>
+                    <pre><code data-trim><script type="text/template">(C++98) algorithm(begin(range), end(range)) ➡️ result</script></code></pre>
+                    <pre class="fragment" data-fragment-index="1"><code data-trim><script type="text/template">(C++20) algorithm(range) ➡️ result</script></code></pre>
+                    <pre class="fragment" data-fragment-index="1"><code data-trim><script type="text/template">(C++20) adaptor(range) ➡️ view</script></code></pre>
+                    <pre class="fragment" data-fragment-index="1"><code data-trim><script type="text/template">(C++20) range | adaptor ➡️ view</script></code></pre>
+                    <pre class="fragment" data-fragment-index="1"><code data-trim><script type="text/template">(C++20) range | adaptor1 | adaptor2 ➡️ view</script></code></pre>
+                    <pre class="fragment" data-fragment-index="2"><code data-trim><script type="text/template">(C++23) range | adaptor1 | user_defined_adaptor | adaptor2 ➡️ view</script></code></pre>
+                    <pre class="fragment" data-fragment-index="2"><code data-trim><script type="text/template">(C++23) range | to<non-view> ➡️ non-view</script></code></pre>
+                </section>
+                <section data-auto-animate>
+                    <h2>C++ Ranges library</h2>
+                    <ul>
+                        <li><b>Particle sets</b> are <em>ranges</em></li>
+                        <li><b>Particle filters</b> are complex <em>algorithms</em> applied to <em>ranges</em></li>
+                    </ul>
+                    <div class="fragment">
+                        <p>The <em>Ranges</em> library provides the tools to write these algorithms in a way that is:</p>
+                        <ul>
+                            <li>Easy to read</li>
+                            <li>Less error-prone</li>
+                            <li>Easy to reuse</li>
+                        </ul>
+                    </div>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Concepts</h2>
+                    <pre data-id="code-animation"><code class="cpp" data-trim data-line-numbers="|1-8|10-13|15-18"><script type="text/template">
+                        template <typename T>
+                        concept ParticleLike =
+                            std::is_object_v<T> &&
+                            requires(T a)
+                            {
+                                { a.state };
+                                { a.weight } -> std::convertible_to<double>;
+                            };
+
+                        template <typename F, typename T>
+                        concept StateUpdateFn =
+                            ParticleLike<T> &&
+                            requires(F f, T t) { { t.state = f(t.state) }; };
+
+                        template <typename F, typename T>
+                        concept ReweightFn =
+                            ParticleLike<T> &&
+                            requires(F f, T t) { { t.weight = f(t.state) }; };
+                    </script></code></pre>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Particle Filter Algorithm</h2>
+                    <p>The filter function should perform two steps:</p>
+                    <p><ul>
+                        <li>Update states and weights</li>
+                        <li>Resample</li>
+                    </ul></p>
+                    <pre data-id="code-animation"><code class="cpp" data-trim data-line-numbers><script type="text/template">
+                        template <ParticleLike T>
+                        void filter(
+                            std::vector<T>& particles,
+                            StateUpdateFn<T> auto state_update_fn,
+                            ReweightFn<T> auto reweight_fn) {
+
+                            ...
+                        }
+
+                    </script></code></pre>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Particle Filter Algorithm</h2>
+                    <h3>Update states and weights</h3>
+                    <p><code>std::views::transform</code></p>
+                    <pre data-id="code-animation"><code class="cpp" data-trim data-line-numbers><script type="text/template">
+                        template <ParticleLike T>
+                        void filter(
+                            std::vector<T>& particles,
+                            StateUpdateFn<T> auto state_update_fn,
+                            ReweightFn<T> auto reweight_fn) {
+
+                            auto states = particles | std::views::transform(&T::state);
+                            auto weights = particles | std::views::transform(&T::weight);
+
+                            ...
+                        }
+
+                    </script></code></pre>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Particle Filter Algorithm</h2>
+                    <h3>Update states and weights</h3>
+                    <p><code>std::ranges::transform</code></p>
+                    <pre data-id="code-animation"><code class="cpp" data-trim data-line-numbers><script type="text/template">
+                        template <ParticleLike T>
+                        void filter(
+                            std::vector<T>& particles,
+                            StateUpdateFn<T> auto state_update_fn,
+                            ReweightFn<T> auto reweight_fn) {
+
+                            auto states = particles | std::views::transform(&T::state);
+                            auto weights = particles | std::views::transform(&T::weight);
+
+                            std::ranges::transform(states, states.begin(), std::move(state_update_fn));
+                            std::ranges::transform(states, weights.begin(), std::move(reweight_fn));
+
+                            ...
+                        }
+
+                    </script></code></pre>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Particle Filter Algorithm</h2>
+                    <h3>Resample</h3>
+                    <p><code>std::discrete_distribution</code></p>
+                    <pre data-id="code-animation"><code class="cpp" data-trim data-line-numbers="13-14|16-23"><script type="text/template">
+                        template <ParticleLike T>
+                        void filter(
+                            std::vector<T>& particles,
+                            StateUpdateFn<T> auto state_update_fn,
+                            ReweightFn<T> auto reweight_fn) {
+
+                            auto states = particles | std::views::transform(&T::state);
+                            auto weights = particles | std::views::transform(&T::weight);
+
+                            std::ranges::transform(states, states.begin(), std::move(state_update_fn));
+                            std::ranges::transform(states, weights.begin(), std::move(reweight_fn));
+
+                            auto gen = std::mt19937{std::random_device()()};
+                            auto dist = weights | std::ranges::to<std::discrete_distribution<std::size_t>>();
+
+                            auto new_particles = std::vector<T>{};
+                            new_particles.reserve(particles.size());
+
+                            for (std::size_t i = 0; i < particles.size(); ++i) {
+                                new_particles.push_back(particles[dist(gen)]);
+                            }
+
+                            std::swap(particles, new_particles);
+                        }
+
+                    </script></code></pre>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Particle Filter Algorithm</h2>
+                    <h3>Resample</h3>
+                    <pre data-id="code-animation"><code class="cpp" data-trim data-line-numbers="15-17"><script type="text/template">
+                        template <ParticleLike T>
+                        void filter(
+                            std::vector<T>& particles,
+                            StateUpdateFn<T> auto state_update_fn,
+                            ReweightFn<T> auto reweight_fn) {
+
+                            auto states = particles | std::views::transform(&T::state);
+                            auto weights = particles | std::views::transform(&T::weight);
+
+                            std::ranges::transform(states, states.begin(), std::move(state_update_fn));
+                            std::ranges::transform(states, weights.begin(), std::move(reweight_fn));
+
+                            auto gen = std::mt19937{std::random_device()()};
+
+                            particles = sample(particles, gen) |
+                                        std::views::take(particles.size()) |
+                                        std::ranges::to<std::vector>();
+                        }
+
+                    </script></code></pre>
+                    <p><ol>
+                        <li>Generate random samples (with replacement)</li>
+                        <li>Take N of those samples</li>
+                        <li>Create a new particle set</li>
+                    </ol></p>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Sample View</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <td><code>std::ranges::sample?<br/>(C++20)</code></td>
+                                <td><code>custom view</code></td>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Algorithm (eager)</td>
+                                <td>View (lazy)</td>
+                            </tr>
+                            <tr>
+                                <td>Fixed size</td>
+                                <td>Infinite</td>
+
+                            </tr>
+                            <tr>
+                                <td>Without replacement</td>
+                                <td>With replacement</td>
+                            </tr>
+                            <tr>
+                                <td>All elements have the same probability</td>
+                                <td>Probability determined by the weights</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Sample View</h2>
+                    <h3>Definition</h3>
+                    <p>Given a particle range and a random number generator (RNG), generate a <b>lazy</b> computed <b>infinite</b> sequence of random samples (<b>with replacement</b>).</p>
+                    <pre><code class="cpp" data-trim><script type="text/template">
+                        sample(particles, gen) ➡️ view
+
+                    </script></code></pre>
+                    <div class="fragment">
+                    <h3>Implementation</h3>
+                    <ul>
+                        <li><code>std::generator</code></li>
+                        <li><code>std::views::generate</code> (C++26)</li>
+                        <li><code>std::views::view_interface</code></li>
+                    </ul>
+                    </div>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Sample View</h2>
+                    <p><code>std::generator</code> (C++23)</p>
+                    <pre data-id="code-animation"><code class="cpp" data-trim data-line-numbers="|1-4|5|6-8|10-12|"><script type="text/template">
+                        template <typename R, typename RNG, typename P = std::ranges::range_value_t<R>>
+                        requires std::ranges::random_access_range<R> &&
+                                 std::uniform_random_bit_generator<RNG> &&
+                                 ParticleLike<P>
+                        std::generator<const P&> sample(R&& particles, RNG& gen) {
+                            auto dist = particles |
+                                        std::views::transform(&P::weight) |
+                                        std::ranges::to<std::discrete_distribution<std::size_t>>();
+
+                            while (true) {
+                                co_yield particles[dist(gen)];
+                            }
+                        }
+
+                    </script></code></pre>
+                    <div class="fragment">
+                        <pre><code class="cpp" data-trim><script type="text/template">
+                            auto input = std::vector{Particle{}};
+                            auto output = sample(input, gen);  // ✅
+
+                        </script></code></pre>
+                        <pre><code class="cpp" data-trim><script type="text/template">
+                            auto output = sample(std::vector{Particle{}}, gen);  // ❌ temporary will be destroyed
+
+                        </script></code></pre>
+                    </div>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Sample View</h2>
+                    <p>Take a range by value?</p>
+                    <pre data-id="code-animation"><code class="cpp" data-trim data-line-numbers="5"><script type="text/template">
+                        template <typename R, typename RNG, typename P = std::ranges::range_value_t<R>>
+                        requires std::ranges::random_access_range<R> &&
+                                 std::uniform_random_bit_generator<RNG> &&
+                                 ParticleLike<P>
+                        std::generator<const P&> sample(R particles, RNG& gen) {
+                            auto dist = particles |
+                                        std::views::transform([](const P& p) { return p.weight; }) |
+                                        std::ranges::to<std::discrete_distribution<std::size_t>>();
+
+                            while (true) {
+                                co_yield particles[dist(gen)];
+                            }
+                        }
+
+                    </script></code></pre>
+                    <pre><code class="cpp" data-trim><script type="text/template">
+                        auto input = std::vector{Particle{}};
+                        auto output = sample(input, gen);  // ✅ (copying the container)
+
+                    </script></code></pre>
+                    <pre><code class="cpp" data-trim><script type="text/template">
+                        auto output = sample(std::vector{Particle{}}, gen);  // ✅
+
+                    </script></code></pre>
+                </section>
+                <section data-auto-animate>
+                    <section>
+                        <h2 data-id="code-title">Sample View</h2>
+                        <p>Take a view by value!</p>
+                        <pre data-id="code-animation"><code class="cpp" data-trim data-line-numbers="1-3,6"><script type="text/template">
+                            template <typename V, typename RNG, typename P = std::ranges::range_value_t<V>>
+                            requires std::ranges::view<V> &&
+                                    std::ranges::random_access_range<V> &&
+                                    std::uniform_random_bit_generator<RNG> &&
+                                    ParticleLike<P>
+                            std::generator<const P&> sample(V particles, RNG& gen) {
+                                auto dist = particles |
+                                            std::views::transform([](const P& p) { return p.weight; }) |
+                                            std::ranges::to<std::discrete_distribution<std::size_t>>();
+
+                                while (true) {
+                                    co_yield particles[dist(gen)];
+                                }
+                            }
+
+                        </script></code></pre>
+                        <pre><code class="cpp" data-trim><script type="text/template">
+                            auto input = std::vector{Particle{}};
+                            auto output = sample(input, gen);  // ❌ std::vector is not a view
+
+                        </script></code></pre>
+                        <pre><code class="cpp" data-trim><script type="text/template">
+                            auto output = sample(std::vector{Particle{}}, gen);  // ❌ std::vector is not a view
+
+                        </script></code></pre>
+                    </section>
+                    <section>
+                        <h2 data-id="code-title">Compiler error</h2>
+                        <pre><code data-trim><script type="text/template">
+                            ranges_base.h:576:13:   required for the satisfaction of 'view<V>'
+                                [with V = std::vector<Particle, std::allocator<Particle> >]
+                            ranges_base.h:577:39: note: the expression 'enable_view<_Tp>
+                                [with _Tp = std::vector<Particle, std::allocator<Particle> >]' evaluated to 'false'
+                              577 |       = range<_Tp> && movable<_Tp> && enable_view<_Tp>;
+                                  |                                       ^~~~~~~~~~~~~~~~
+                        </script></code></pre>
+                    </section>
+                </section>
+                <section data-auto-animate>
+                    <section>
+                        <h2 data-id="code-title">Sample View</h2>
+                        <p>Use <code>std::views::all</code> to convert any range into a view</p>
+                        <pre data-id="code-animation"><code class="cpp" data-trim data-line-numbers="6, 16-20"><script type="text/template">
+                            template <typename V, typename RNG, typename P = std::ranges::range_value_t<V>>
+                            requires std::ranges::view<V> &&
+                                    std::ranges::random_access_range<V> &&
+                                    std::uniform_random_bit_generator<RNG> &&
+                                    ParticleLike<P>
+                            std::generator<const P&> sample_impl(V particles, RNG& gen) {
+                                auto dist = particles |
+                                            std::views::transform([](const P& p) { return p.weight; }) |
+                                            std::ranges::to<std::discrete_distribution<std::size_t>>();
+
+                                while (true) {
+                                    co_yield particles[dist(gen)];
+                                }
+                            }
+
+                            template <typename R, typename RNG>
+                            requires std::ranges::viewable_range<R>
+                            auto sample(R&& particles, RNG& gen) {
+                                return sample_impl(std::views::all(std::forward<R>(particles)), gen);
+                            }
+
+                        </script></code></pre>
+                        <div class="fragment">
+                            <pre><code class="cpp" data-trim><script type="text/template">
+                                auto input = std::vector{Particle{}};
+                                auto output = sample(input, gen);  // ✅
+
+                            </script></code></pre>
+                            <pre><code class="cpp" data-trim><script type="text/template">
+                                auto output = sample(std::vector{Particle{}}, gen);  // ❌ does not compile (yet)
+
+                            </script></code></pre>
+                        </div>
+                    </section>
+                    <section>
+                        <h2 data-id="code-title">Compiler error</h2>
+                        <img src="img/error.png" style="height: 30vh;"></img>
+                    </section>
+                    <section>
+                        <h2 data-id="code-title">Compiler error</h2>
+                        <pre><code data-trim><script type="text/template">
+                            sample.h:18:27: error: no match for 'operator|'
+                                (operand types are
+                                    'std::ranges::owning_view<std::vector<Particle> >' and
+                                    'std::ranges::views::__adaptor::_Partial<...>')
+
+                               18 |     auto dist = particles |
+                                  |                 ~~~~~~~~~~^
+                               19 |                 std::views::transform([](const P& p) { return p.weight; }) |
+                                  |                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+                                ...
+
+                            ranges_base.h:808:13:   required for the satisfaction of 'viewable_range<_Range>'
+                                [with _Range = std::ranges::owning_view<std::vector<Particle, std::allocator<Particle> > >&]
+                            ranges_base.h:810:11: note: no operand of the disjunction is satisfied
+                              809 |       && ((view<remove_cvref_t<_Tp>> && constructible_from<remove_cvref_t<_Tp>, _Tp>)
+                                  |          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                              810 |           || (!view<remove_cvref_t<_Tp>>
+                                  |           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                              811 |               && (is_lvalue_reference_v<_Tp>
+                                  |               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                              812 |                   || (movable<remove_reference_t<_Tp>>
+                                  |                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                              813 |                       && !__detail::__is_initializer_list<remove_cvref_t<_Tp>>))));
+                                  |                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                        </script></code></pre>
+                    </section>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Sample View</h2>
+                    <p>Use <code>std::ranges::ref_view</code> to iterate over an owning view without moving it</p>
+                    <pre data-id="code-animation"><code class="cpp" data-trim data-line-numbers="7|"><script type="text/template">
+                        template <typename V, typename RNG, typename P = std::ranges::range_value_t<V>>
+                        requires std::ranges::view<V> &&
+                                 std::ranges::random_access_range<V> &&
+                                 std::uniform_random_bit_generator<RNG> &&
+                                 ParticleLike<P>
+                        std::generator<const P&> sample_impl(V particles, RNG& gen) {
+                            auto dist = std::ranges::ref_view(particles) |
+                                        std::views::transform([](const P& p) { return p.weight; }) |
+                                        std::ranges::to<std::discrete_distribution<std::size_t>>();
+
+                            while (true) {
+                                co_yield particles[dist(gen)];
+                            }
+                        }
+
+                        template <typename R, typename RNG>
+                        requires std::ranges::viewable_range<R>
+                        auto sample(R&& particles, RNG& gen) {
+                            return sample_impl(std::views::all(std::forward<R>(particles)), gen);
+                        }
+
+                    </script></code></pre>
+                    <div class="fragment">
+                        <pre><code class="cpp" data-trim><script type="text/template">
+                            auto input = std::vector{Particle{}};
+                            auto output = sample(input, gen);  // ✅
+
+                        </script></code></pre>
+                        <pre><code class="cpp" data-trim><script type="text/template">
+                            auto output = sample(std::vector{Particle{}}, gen);  // ✅
+
+                        </script></code></pre>
+                    </div>
+                </section>
+                <section>
+                    <h2 data-id="code-title">Sample View</h2>
+                    <h3>Performance comparison</h3>
+                    <p>Initialize a vector by taking N samples from a small particle set.</p>
+                    <img src="img/performance_chart_1.svg" style="height: 30vh;">
+                    <p><code>GCC 14.1.0 -std=gnu++23 -O3 -DNDEBUG</code></p>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Sample View</h2>
+                    <p><code>std::views::generate? (Tier 1 candidate for C++26 Ranges)</code></p>
+                    <pre><code class="cpp" data-trim data-line-numbers="|11-14"><script type="text/template">
+                        template <typename V, typename RNG, typename P = std::ranges::range_value_t<V>>
+                        requires std::ranges::view<V> &&
+                                 std::ranges::random_access_range<V> &&
+                                 std::uniform_random_bit_generator<RNG> &&
+                                 ParticleLike<P>
+                        auto sample_impl(V particles, RNG& gen) {
+                            auto dist = std::ranges::ref_view(particles) |
+                                        std::views::transform([](const P& p) { return p.weight; }) |
+                                        std::ranges::to<std::discrete_distribution<std::size_t>>();
+
+                            return std::views::generate(
+                                [particles, dist = std::move(dist), &gen] {
+                                    return particles[dist(gen)];
+                                });
+                        }
+
+                        template <typename R, typename RNG>
+                        requires std::ranges::viewable_range<R>
+                        auto sample(R&& particles, RNG& gen) {
+                            return sample_impl(std::views::all(std::forward<R>(particles)), gen);
+                        }
+
+                    </script></code></pre>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Sample View</h2>
+                    <h3>Design choices</h3>
+                    <div class="r-hstack">
+                        <img src="img/sample_view.drawio.svg" style="width: 20em; margin: 1em;">
+                        <img src="img/sample_iterator_increment.drawio.svg" style="width: 15em; margin: 1em;">
+                    </div>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Sample View</h2>
+                    <p><code>std::ranges::view_interface</code></p>
+                    <pre data-id="code-animation"><code class="cpp" data-trim data-line-numbers><script type="text/template">
+                        template <typename V, typename RNG, typename P = std::ranges::range_value_t<V>>
+                        requires std::ranges::view<V> &&
+                                 std::ranges::random_access_range<V> &&
+                                 std::uniform_random_bit_generator<RNG> &&
+                                 ParticleLike<P>
+                        class sample_view : public std::ranges::view_interface<sample_view<V, RNG, P>> {
+                            ...
+                        };
+
+                    </script></code></pre>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Sample View</h2>
+                    <pre data-id="code-animation"><code class="cpp" data-trim data-line-numbers="4-12|14-17|19-20|28"><script type="text/template">
+                        template <typename V, typename RNG, typename P = std::ranges::range_value_t<V>>
+                        class sample_view : public std::ranges::view_interface<sample_view<V, RNG, P>> {
+                        public:
+                            sample_view(V base, RNG& gen)
+                              : base_{std::move(base)},
+                                first_{std::ranges::begin(base_)},
+                                gen_{std::addressof(gen)},
+                                dist_{
+                                    std::ranges::ref_view(base_) |
+                                    std::views::transform([](const P& p) { return p.weight; }) |
+                                    std::ranges::to<std::discrete_distribution<std::size_t>>()
+                                } {}
+
+                            sample_view(const sample_view&) = delete;
+                            sample_view(sample_view&&) = default;
+                            sample_view& operator=(const sample_view&) = delete;
+                            sample_view& operator=(sample_view&&) = default;
+
+                            auto begin() { return iterator{this}; }
+                            auto end() const noexcept { return std::unreachable_sentinel; }
+
+                        private:
+                            V base_;
+                            std::ranges::const_iterator_t<V> first_;
+                            RNG* gen_;
+                            std::discrete_distribution<std::size_t> dist_;
+
+                            auto next() { return first_ + dist_(*gen_); }
+
+                            class iterator { ... };
+
+                            static_assert(std::input_iterator<iterator>);
+                        };
+
+                    </script></code></pre>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Sample View</h2>
+                    <pre data-id="code-animation"><code class="cpp" data-trim data-line-numbers="30-46"><script type="text/template">
+                        template <typename V, typename RNG, typename P = std::ranges::range_value_t<V>>
+                        class sample_view : public std::ranges::view_interface<sample_view<V, RNG, P>> {
+                        public:
+                            sample_view(V base, RNG& gen)
+                              : base_{std::move(base)},
+                                first_{std::ranges::begin(base_)},
+                                gen_{std::addressof(gen)},
+                                dist_{
+                                    std::ranges::ref_view(base_) |
+                                    std::views::transform(&P::weight) |
+                                    std::ranges::to<std::discrete_distribution<std::size_t>>()
+                                } {}
+ 
+                            sample_view(const sample_view&) = delete;
+                            sample_view(sample_view&&) = default;
+                            sample_view& operator=(const sample_view&) = delete;
+                            sample_view& operator=(sample_view&&) = default;
+
+                            auto begin() { return iterator{this}; }
+                            auto end() const noexcept { return std::unreachable_sentinel; }
+
+                        private:
+                            V base_;
+                            std::ranges::const_iterator_t<V> first_;
+                            RNG* gen_;
+                            std::discrete_distribution<std::size_t> dist_;
+
+                            auto next() { return first_ + dist_(*gen_); }
+
+                            class iterator {
+                            public:
+                                using difference_type = std::ptrdiff_t;
+                                using value_type = P;
+
+                                explicit iterator(sample_view* v) : v_{v}, cur_{v_->next()} {}
+
+                                auto& operator++() { cur_ = v_->next(); return *this; }
+
+                                auto operator++(int) { ... }
+
+                                decltype(auto) operator*() const { return *cur_; }
+
+                            private:
+                                sample_view* v_;
+                                std::ranges::const_iterator_t<V> cur_;
+                            };
+
+                            static_assert(std::input_iterator<iterator>);
+                        };
+
+                    </script></code></pre>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Sample View</h2>
+                    <p>Deduction guide to construct a <code>sample_view</code> from any range</p>
+                    <pre data-id="code-animation"><code class="cpp" data-trim data-line-numbers="6-7|9-12|"><script type="text/template">
+                        template <typename V, typename RNG, typename P = std::ranges::range_value_t<V>>
+                        class sample_view : public std::ranges::view_interface<sample_view<V, RNG, P>> {
+                            ...
+                        };
+
+                        template <typename R, typename RNG, typename P = std::ranges::range_value_t<R>>
+                        sample_view(R&&, RNG&) -> sample_view<std::views::all_t<R>, RNG, P>;
+
+                        template <typename R, typename RNG>
+                        auto sample(R&& range, RNG& gen) {
+                            return sample_view{std::forward<R>(range), gen};
+                        }
+
+                    </script></code></pre>
+                </section>
+                <section>
+                    <section>
+                        <h2 data-id="code-title">Sample View</h2>
+                        <h3>Performance comparison</h3>
+                        <p>Initialize a vector by taking N samples from a small particle set.</p>
+                        <img src="img/performance_chart_2.svg" style="height: 30vh;">
+                        <p><code>GCC 14.1.0 -std=gnu++23 -O3 -DNDEBUG (Intel(R) Xeon(R))</code></p>
+                    </section>
+                    <section>
+                        <h2 data-id="code-title">Sample View</h2>
+                        <p>Initialize a vector by taking N samples from a small particle set.</p>
+                        <img src="img/performance_chart_3.svg" style="height: 30vh;">
+                        <p><code>GCC 14.1.0 -std=gnu++23 -O3 -DNDEBUG (AMD Ryzen 9 5900HX)</code></p>
+                    </section>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Sample View</h2>
+                    <pre><code class="cpp" data-trim><script type="text/template">
+                        sample(particles, gen) ➡️ view ✅
+
+                    </script></code></pre>
+                    <pre class="fragment" data-fragment-index="0"><code class="cpp" data-trim><script type="text/template">
+                        sample(gen)(particles) ➡️ view ❌
+
+                    </script></code></pre>
+                    <pre class="fragment" data-fragment-index="0"><code class="cpp" data-trim><script type="text/template">
+                        particles | sample(gen) ➡️ view ❌
+
+                    </script></code></pre>
+                    <div class="fragment" data-fragment-index="1">
+                        <p>What do we need to fix?</p>
+                        <pre><code data-trim><script type="text/template">
+                            sample(gen) ➡️ C (range adaptor closure object)
+
+                        </script></code></pre>
+                        <blockquote cite="https://en.cppreference.com/w/cpp/named_req/RangeAdaptorClosureObject">
+                            If C is a range adaptor closure object and R is a range,<br/>
+                            these two expressions are equivalent:<br/>
+                            C(R)<br/>
+                            R | C
+                        </blockquote>
+                    </div>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Sample View</h2>
+                    <pre data-id="code-animation"><code class="cpp" data-trim data-line-numbers><script type="text/template">
+                        template <typename V, typename RNG, typename P = std::ranges::range_value_t<V>>
+                        class sample_view : public std::ranges::view_interface<sample_view<V, RNG, P>> {
+                            ...
+                        };
+
+                        template <typename R, typename RNG, typename P = std::ranges::range_value_t<R>>
+                        sample_view(R&&, RNG&) -> sample_view<std::views::all_t<R>, RNG, P>;
+
+                        template <typename R, typename RNG>
+                        auto sample(R&& range, RNG& gen) {
+                            return sample_view{std::forward<R>(range), gen};
+                        }
+
+                    </script></code></pre>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Sample View</h2>
+                    <pre data-id="code-animation"><code class="cpp" data-trim data-line-numbers="14-17"><script type="text/template">
+                        template <typename V, typename RNG, typename P = std::ranges::range_value_t<V>>
+                        class sample_view : public std::ranges::view_interface<sample_view<V, RNG, P>> {
+                            ...
+                        };
+
+                        template <typename R, typename RNG, typename P = std::ranges::range_value_t<R>>
+                        sample_view(R&&, RNG&) -> sample_view<std::views::all_t<R>, RNG, P>;
+
+                        template <typename R, typename RNG>
+                        auto sample(R&& range, RNG& gen) {
+                            return sample_view{std::forward<R>(range), gen};
+                        }
+
+                        template <typename RNG>
+                        auto sample(RNG& gen) {
+                            ...
+                        }
+
+                    </script></code></pre>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Sample View</h2>
+                    <p><code>std::ranges::range_adaptor_closure</code> (C++23)</p>
+                    <pre data-id="code-animation"><code class="cpp" data-trim data-line-numbers="9-21|23-33"><script type="text/template">
+                        template <typename R, typename RNG, typename P = std::ranges::range_value_t<R>>
+                        class sample_view : public std::ranges::view_interface<sample_view<R, RNG, P>> {
+                            ...
+                        };
+
+                        template <typename R, typename RNG, typename P = std::ranges::range_value_t<R>>
+                        sample_view(R&&, RNG&) -> sample_view<std::views::all_t<R>, RNG, P>;
+
+                        template <typename RNG>
+                        class sample_closure : public std::ranges::range_adaptor_closure<sample_closure<RNG>> {
+                        public:
+                            explicit sample_closure(RNG& gen) : gen_{gen} {}
+
+                            template <typename R>
+                            auto operator()(R&& range) const {
+                                return sample_view{std::forward<R>(range), gen_};
+                            }
+
+                        private:
+                            RNG& gen_;
+                        };
+
+                        template <typename R, typename RNG>
+                        auto sample(R&& range, RNG& gen) {
+                            return sample_view{std::forward<R>(range), gen};
+                        }
+
+                        template <typename RNG>
+                        auto sample(RNG& gen) {
+                            return sample_closure{gen};
+                        }
+
+                    </script></code></pre>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Sample View</h2>
+                    <pre><code class="cpp" data-trim><script type="text/template">
+                        sample(particles, gen) ➡️ view ✅
+
+                    </script></code></pre>
+                    <pre><code class="cpp" data-trim><script type="text/template">
+                        sample(gen)(particles) ➡️ view ✅
+
+                    </script></code></pre>
+                    <pre><code class="cpp" data-trim><script type="text/template">
+                        particles | sample(gen) ➡️ view ✅
+
+                    </script></code></pre>
+                    <h3>Recap</h3>
+                    <table>
+                        <tr>
+                            <td><code>sample_view</code></td>
+                            <td>A view class that implements the main iteration logic</td>
+                        </tr>
+                        <tr>
+                            <td><code>sample_closure</code></td>
+                            <td>A pipable object that captures configuration arguments and can create a view given a range</td>
+                        </tr>
+                        <tr>
+                            <td><code>sample</code></td>
+                            <td>A function that can create a view or a closure depending on the arguments</td>
+                        </tr>
+                    </table>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Separate Containers</h2>
+                    <pre data-id="code-animation-1"><code class="cpp" data-trim data-line-numbers><script type="text/template">
+                        const auto states = std::vector<std::array<double, 50>>{...};
+                        const auto weights = std::vector<double>{...};
+
+                    </script></code></pre>
+                    <pre class="fragment" data-id="code-animation-2"><code class="cpp" data-trim data-line-numbers="1-7|9-15|17-21"><script type="text/template">
+                        template <typename S, typename W>
+                        struct ParticleRef {
+                            const S& state;
+                            const W& weight;
+
+                            static_assert(ParticleLike<ParticleRef>);
+                        };
+
+                        auto to_particle = [](const auto& state, const auto& weight) {
+                            return ParticleRef{state, weight};
+                        };
+
+                        auto to_state = [](const auto& p) -> decltype(auto) {
+                            return p.state;
+                        };
+
+                        const auto new_states = zip_transform(to_particle, states, weights) |
+                                                sample(gen) |
+                                                take(1'000) |
+                                                transform(to_state) |
+                                                to<std::vector>();
+
+                    </script></code></pre>
+                </section>
+                <section data-auto-animate>
+                    <h2 data-id="code-title">Other Range Adaptors</h2>
+                    <pre><code class="cpp" data-trim><script type="text/template">
+                        /* Resample algorithm in MCL */
+                        particles = particles | 
+                                    sample(gen) |
+                                    take(particles.size()) |
+                                    to<std::vector>();
+
+                    </script></code></pre>
+                    <pre class="fragment"><code class="cpp" data-trim><script type="text/template">
+                        /* Resample algorithm in AMCL (Adaptive Monte-Carlo Localization) */
+                        particles = particles |
+                                    sample(gen) |
+                                    take_until_kld() |
+                                    to<std::vector>();
+
+                    </script></code></pre>
+                    <pre class="fragment"><code class="cpp" data-trim><script type="text/template">
+                        /* Recovery strategy to deal with the kidnapped robot problem */
+                        particles = particles | 
+                                    sample(gen) |
+                                    random_intersperse(map_distribution, probability, gen) |
+                                    take_until_kld() |
+                                    to<std::vector>();
+
+                    </script></code></pre>
+                </section>
+                <section data-auto-animate>
+                    <h2>Practical recommendations</h2>
+                    <ul>
+                        <li>Leverage concepts and static assertions as much as possible</li>
+                        <li class="fragment">Beware of semantic requirements: <em>cheaply-copyable</em>, <em>regular-invocable</em></li>
+                        <li class="fragment">Check out papers and source:
+                            <ul>
+                                <li><a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2387r3.html">P2387R3</a>: Pipe support for user-defined range adaptors</li>
+                                <li><a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2214r0.html">P2214R0</a>: A Plan for C++23 Ranges</li>
+                                <li><a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2760r1.html">P2760R1</a>: A Plan for C++26 Ranges</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </section>
+                <section data-auto-animate>
+                    <h2>Practical recommendations</h2>
+                    <h3>Range-v3 (C++17)</h3>
+                    <p><a href="https://godbolt.org/z/b98e5eb9E">https://godbolt.org/z/b98e5eb9E</a></p>
+                    <iframe width="100%" height="500px" src="https://godbolt.org/e#z:OYLghAFBqd5QCxAYwPYBMCmBRdBLAF1QCcAaPECAMzwBtMA7AQwFtMQByARg9KtQYEAysib0QXACx8BBAKoBnTAAUAHpwAMvAFYTStJg1DIApACYAQuYukl9ZATwDKjdAGFUtAK4sGIAKwAbKSuADJ4DJgAcj4ARpjEEhpmpAAOqAqETgwe3r4BwemZjgLhkTEs8YlcybaY9iUMQgRMxAS5Pn5BdQ3Zza0EZdFxCUkpCi1tHfndEwNDFVVjAJS2qF7EyOwc5gDMEcjeWADUJrtuxIboqCxn2CYaAIIPz2b7DIdeJ2cXhsCYAHoAG67YF4TAAdwBVCYoiwADoEKlUncXnsDkdMKdzpcjICQWDIQCCLiFPxiCxEcjUU90R9MdjfnjgaDcf8AWgGECEpkBFSUbt7rTaW8MV8sT82fjQUDwVCWgBrTAAfUwqlhBFoAE9%2BTTniL3p9vucqCwCBySJhEXq6UaJSazQCpQprYK0aL6eLGabzeSWEwCK6hfrHhNiF4HMdlAM8IcJQB2KxPY4p44RAjHOYETBnJOPVPHa5eWL0Y4QzB4YAIAi5tHxgAiteFj2zLFSBmzjMOTAUCmOADVSMdu73jgAlKIAcSHI77ymx9eOzpAIClyqBYi8Kpr537qLdT1nmdY7ZVsshxxAx1SxdosaXf0wChX54hyphcJz5wUJ/o67lPyDuOU53EOy4gBENAMIQX7YKciYvDeJaxiALwFj%2BbZ/q%2BEDLAuhaYDCXi0DueZoamGGnv%2BkIQP2xyxD2mBDhOk7mIExz/AwyxkQWV70UoyomImEzoCuLCoNyEB8ZgXENqQ3EFscNDEBMAmJuB8TABEkkMcqMn1nJyYKSmHGqRYwkrkw6DoMQT4KKgVDQIwekGfmRmFngKmCXmbkKSY/hWGYgR%2BfWOHwd5PluUwXhEGWFZVgQfZnIuUnKvBbgPniz4gK%2BWUkoYZIkCwEB%2BVY/ghZyExRqx164V5S6YAQGwMNe8LlpW1a5vB9Zcbs4URQpNmNcQzXmSA%2BAKMgg0quNJJ4LE0XZD8o2ZAAXtuqKJm18UuhpWmrLF7UJfCrg4YJja9fJPlnadhlGWdYVnWiTypMQeAbtmqG3QOdE6U2rkpuBMGXEQxDKjubh7oKil4MpBACRdX3MQAVOxjDw31mYECJY0eZNDXTR5s3zY0S1Yyuq3rVDM3o09/3HFFMWRKoBChXVg1NdDsOpdY7kqRASMmT1FhdbTBZUK9rgZf8WVrrCWy9n98lhhGGbIBsdnEA9X1IXeyCfXTBZq8pJCs7si5YIRxGK19BZqu2saEMO6smxRWFyijQJcTbblXkCyoQJ7Q6EKZfsALR3EzLN6Q9Dai25WCHAQWqpJgEAM6guE2ZZoUVRmbMNRzSPB51j3Nj5QKoHg6DHJHrOJmmcN4WHEdqlHJex2XqYvW9AbsJd5G/me7vHH7f0%2BYD2bAyQYOAXcDc019j0IyGBbp3RmCaQwypGxrdfC%2Bzw1O8bxBeQQCAeUvwul3Ta%2BuNvzvEDnAiVQwqBqlsqR5/XB/NeBXgMFnZACAmAlhVEoQQER6gzwQrHXqItaSwNIk8Vs7Ze6MiTinZgbBxxDgwYwVgWJmK4OTvg7B84kpSyfCuNcG5vCUzcGOfcwZXZD2oowwKrEmIgUCrhcOUMWFUQhJKR8WUcoWVoLQGe5xGGCi4dOKqbpl4vBQR2e0bg8FYMISBA8jwjwCMOBkDYCY8w6xQvJO2utHb6NoIYmyEBmLVQ4rhK8JkvIcXul5a%2B8kVFoJ%2BBogh449Sr2iqgY4qAU5T0fssexrFqpSlwrnLWBtUw/2PJhVhQihJkxAOSCErR0A/BkdgCA8ShyuMQfJLxz1XrvT7ojbhbFXFKIqc2ZWkYBGWSYJ/EgSSCw%2BM7H4khmjgIsR0cEmK4SEgBhNtEhxgVUacWHM/L%2BGMCypPAv6JUgjt42IUEYiA1jbE5kTO4hsQtKkdxXqmfpaj/HYLHMQzBASHFjNTGvSZkScIxI4fMqUcjHFOSWQwSqnjvYAwLofQ5eybJuMYNdUauT8mFLuCUx8yxzmL0uZfWmEQ7yRCBRMO2msOnoC6SDNJp5ra6IMKOM0XAACc9LdjxkvNeW895Rp0sZcy3pqYvCZCMJjbGXKmXxlEgQBlorFYtJDOmY4/otJytaMAZAM5gGayRkjZVnteUpizPeM%2BWd0DKhsaIWg9MQkLLwiK5lXlRq4muCwZUWBZRbC%2BXpKl4zQkRBvHnM2QqLLEEuFqLy0Y2ixnoF5fwQ4uBnSHGGxwcYvLSGOBoeE/hHoyq9WE6Kvq8I%2Buimlfu/U9WD0coswSbhi0lvAmIkAioVRqg1NqCAZgNC1XjFWsFNaREvjlLlUkfpiqBQTRG9gIAszSU9amH0K5u6CGHWYTxsczApEUmaFc2hK4MAgOsAgvqhzmBSEe9F0r6wcFWLQTg/heB%2BG4LwVAnAq2WB5nZDYWxThvB4KQAgmgL2rAVAELg6bAi7CZZIeMuxAj0sCKugAHPoTgkheAsACBoUgd6tCkEfRwXgz50O/o4FoVYcBYAwEQCgG4qQ6AJHIJQNAbYaOJGAFILgfA6CT2fJJP9pBYgRFaFqTg36%2BPMGIFqAA8rEbQmAHBCd4AxtgghxMMG1DxrA81gBuDELQZ897SBYH9EYcQRHeD4Bsg4N6VCTMhFUDJ6K2wsPpnqDxu8sRLhiY8FgOTP7Xqob09yYgsQMiYHrJgQzwA8WgBM6sKgBhgAKH7HKcTmDvP8EECIMQ7ApAyEEIoFQ6hrO6DYwYIwKBrDWH0HNZ8sBNE5LNKQALQmajEdIBAWrwBUCoAi/jCYDXRgkn/gqEjtXnQgj64kIjXA23/uw5/bIunQ7CSSqYF9lguAstDuJ3YD6AuvSwNVnCPQZONBcAwdwnhOh6DCJAxYow2NFCyAIaYfh7sZEewwBYIxqhHYswIfoUwLv5DY3YY7fRJiDBu19vQcwAd5Be7YcHn3Kh3dWG%2BzYWXL3XtvTxnDxxVBwcCKHQIkh2LIGQMcKQ8IuDHAgLgQgPS9hcGWLwQjxHVgIEwJZUYh3AP%2BHQ1ejgyHSCob5xhnHnA8MgAI3%2Bkj5GIBID3QeigEAGPUfoMQKIBDOD48J8T0n5PKffswPgEGVc9BpeEGarL0gLd5bUDxorpAISXFSHJzHHAb1i%2Bszh8TubC32TxwTonJOVUG8kFTmnHhGPq8/bsJnLOZfs851gRIPO0OIcF9j73EvbBS5/YnjPZgUPp8ww%2BnPrOZuAeaxn7bXusM4YT9F1YAXeR%2BEkEAA%3D%3D"></iframe>
+                </section>
+                <section data-auto-animate>
+                    <h2>Practical recommendations</h2>
+                    <h3>Range-v3 (C++17)</h3>
+                    <p><a href="https://github.com/Ekumen-OS/beluga">https://github.com/Ekumen-OS/beluga</a></p>
+                    <div class="r-hstack">
+                        <img src="img/beluga.png" style="height: 20vh; margin: 1em;">
+                        <img src="img/ros.svg" style="height: 20vh; margin: 1em;">
+                    </div>
+                </section>
+                <section data-auto-animate>
+                    <h2>Final remarks</h2>
+                    <ul>
+                        <li>We can use the STL to implement composable range adaptors for domain specific applications like particle filters.</li>
+                    </ul>
+                </section>
+                <section data-auto-animate>
+                    <h2>Final remarks</h2>
+                    <ul>
+                        <li>We can use the STL to implement composable range adaptors for domain specific applications like particle filters.</li>
+                        <li>Ranges are useful to implement complex algorithms in a way that's straightforward to write, easy to read, and easy to reuse.</li>
+                    </ul>
+                </section>
+                <section data-state="disable-background">
+                    <div class="r-hstack">
+                        <img src="img/ekumen.png" style="height: 5vh; margin: 1em;">
+                        <img src="img/beluga.png" style="height: 10vh; margin: 1em;">
+                    </div>
+                    <h2 style="margin: 2em;">Thanks!</h2>
+                    <p><a href="https://github.com/nahueespinosa/presentation-cppcon2024">https://github.com/nahueespinosa/presentation-cppcon2024</a></p>
+                </section>
+            </div>
+        </div>
+
+        <script src="dist/reveal.js"></script>
+        <script src="plugin/notes/notes.js"></script>
+        <script src="plugin/markdown/markdown.js"></script>
+        <script src="plugin/highlight/highlight.js"></script>
+        <script>
+            // More info about initialization & config:
+            // - https://revealjs.com/initialization/
+            // - https://revealjs.com/config/
+            Reveal.initialize({
+                hash: true,
+                slideNumber: true,
+
+                // Learn about plugins: https://revealjs.com/plugins/
+                plugins: [ RevealMarkdown, RevealHighlight, RevealNotes ]
+            });
+        </script>
+    </body>
 </html>
